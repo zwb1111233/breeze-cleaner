@@ -1,0 +1,143 @@
+# 清风清理默认规则库
+# ============================
+# 你也可以添加自己的 .yaml 文件到 rules/ 目录。
+# 字段说明：
+#   id          唯一标识（不要和内置规则重复）
+#   name        界面显示名称
+#   description 一句话说明
+#   category    system / browser / dev
+#   risk        low=默认勾选  medium=默认不勾选（界面会提示「需注意」）
+#   note        额外注意事项，会显示在界面上
+#   targets     清理目标列表：
+#     base      目录路径，支持 %TEMP% 这类环境变量
+#     mode      contents=清空目录内容(保留目录本身) / whole=整个目录 / pattern=按 patterns 通配
+#     patterns  mode=pattern 时生效，相对 base 的通配符；匹配到的目录按「清空内容」处理
+
+rules:
+  - id: user_temp
+    name: 用户临时文件
+    description: 应用程序运行时留下的临时文件
+    category: system
+    risk: low
+    targets:
+      - base: "%TEMP%"
+        mode: contents
+
+  - id: windows_temp
+    name: 系统临时文件
+    description: Windows 自身的临时目录（无权限的部分会自动跳过）
+    category: system
+    risk: low
+    targets:
+      - base: "%WINDIR%\\Temp"
+        mode: contents
+
+  - id: thumbnails
+    name: 缩略图缓存
+    description: 文件夹缩略图缓存，删除后首次打开会重新生成
+    category: system
+    risk: low
+    targets:
+      - base: "%LOCALAPPDATA%\\Microsoft\\Windows\\Explorer"
+        mode: pattern
+        patterns: ["thumbcache_*.db", "iconcache_*.db"]
+
+  - id: directx_cache
+    name: DirectX 着色器缓存
+    description: 游戏和图形应用编译后的着色器缓存
+    category: system
+    risk: low
+    targets:
+      - base: "%LOCALAPPDATA%\\D3DSCache"
+        mode: whole
+
+  - id: crash_dumps
+    name: 应用崩溃转储
+    description: 程序崩溃时生成的诊断文件，普通用户用不到
+    category: system
+    risk: low
+    targets:
+      - base: "%LOCALAPPDATA%\\CrashDumps"
+        mode: contents
+
+  - id: wer_reports
+    name: Windows 错误报告
+    description: 已上传/排队的问题报告队列
+    category: system
+    risk: low
+    targets:
+      - base: "%LOCALAPPDATA%\\Microsoft\\Windows\\WER"
+        mode: pattern
+        patterns: ["ReportQueue/*", "ReportArchive/*"]
+
+  - id: windows_update
+    name: Windows 更新缓存
+    description: 已安装更新的旧安装包
+    category: system
+    risk: medium
+    note: 需要管理员权限，无权限时自动跳过
+    targets:
+      - base: "%WINDIR%\\SoftwareDistribution\\Download"
+        mode: contents
+
+  - id: chrome_cache
+    name: Chrome 浏览器缓存
+    description: 网页缓存，删除后首次打开网页会稍慢
+    category: browser
+    risk: medium
+    note: 清理前建议关闭 Chrome
+    targets:
+      - base: "%LOCALAPPDATA%\\Google\\Chrome\\User Data"
+        mode: pattern
+        patterns: ["*/Cache", "*/Code Cache", "*/GPUCache", "*/Media Cache", "*/Service Worker/CacheStorage"]
+
+  - id: edge_cache
+    name: Edge 浏览器缓存
+    description: 网页缓存，删除后首次打开网页会稍慢
+    category: browser
+    risk: medium
+    note: 清理前建议关闭 Edge
+    targets:
+      - base: "%LOCALAPPDATA%\\Microsoft\\Edge\\User Data"
+        mode: pattern
+        patterns: ["*/Cache", "*/Code Cache", "*/GPUCache", "*/Media Cache", "*/Service Worker/CacheStorage"]
+
+  - id: firefox_cache
+    name: Firefox 浏览器缓存
+    description: 网页缓存与启动缓存
+    category: browser
+    risk: medium
+    note: 清理前建议关闭 Firefox
+    targets:
+      - base: "%LOCALAPPDATA%\\Mozilla\\Firefox\\Profiles"
+        mode: pattern
+        patterns: ["*/cache2", "*/startupCache"]
+
+  - id: brave_cache
+    name: Brave 浏览器缓存
+    description: 网页缓存
+    category: browser
+    risk: medium
+    note: 清理前建议关闭 Brave
+    targets:
+      - base: "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\User Data"
+        mode: pattern
+        patterns: ["*/Cache", "*/Code Cache", "*/GPUCache"]
+
+  - id: pip_cache
+    name: pip 下载缓存
+    description: Python 包的下载缓存，删除后下次安装会重新下载
+    category: dev
+    risk: low
+    targets:
+      - base: "%LOCALAPPDATA%\\pip\\cache"
+        mode: whole
+
+  - id: npm_cache
+    name: npm 缓存
+    description: Node.js 包缓存，可用 npm cache verify 重建
+    category: dev
+    risk: low
+    targets:
+      - base: "%LOCALAPPDATA%\\npm-cache"
+        mode: whole
