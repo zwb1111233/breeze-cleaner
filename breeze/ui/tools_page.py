@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QAbstractItemView, QDoubleSpinBox, QFileDialog, QHBoxLayout,
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFileDialog, QHBoxLayout,
                                QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
                                QMessageBox, QTabWidget, QTableWidget, QTableWidgetItem,
                                QVBoxLayout, QWidget)
@@ -17,7 +17,7 @@ from ..core.bigfiles import scan_empty_dirs, scan_large_files
 from ..core.cleaner import delete_paths
 from ..core.safety import is_within
 from ..workers import Worker
-from .widgets import Card, human, page_header, pill, run_with_progress
+from .widgets import Card, human, page_header, pill, run_with_progress, smooth_scroll
 
 
 def _open_location(path: Path):
@@ -74,10 +74,9 @@ class ToolsPage(QWidget):
         h2 = QHBoxLayout()
         h2.setSpacing(10)
         h2.addWidget(QLabel("找出大于"), 0)
-        self.lf_min = QDoubleSpinBox()
-        self.lf_min.setRange(1, 10240)
-        self.lf_min.setValue(100)
-        self.lf_min.setSuffix(" MB")
+        self.lf_min = QComboBox()
+        for label, mb in (("100 MB", 100), ("500 MB", 500), ("1 GB", 1024), ("2 GB", 2048)):
+            self.lf_min.addItem(label, mb)
         h2.addWidget(self.lf_min, 0)
         h2.addStretch(1)
         self.lf_scan = pill("开始扫描", "primary")
@@ -94,6 +93,7 @@ class ToolsPage(QWidget):
         self.lf_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.lf_table.verticalHeader().setVisible(False)
         self.lf_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        smooth_scroll(self.lf_table)
         v.addWidget(self.lf_table, 1)
         return w
 
@@ -110,7 +110,7 @@ class ToolsPage(QWidget):
             QMessageBox.warning(self, "无效文件夹", "请选择真实存在的文件夹。")
             return
         self.lf_scan.setEnabled(False)
-        worker = Worker(scan_large_files, root, float(self.lf_min.value()), parent=self)
+        worker = Worker(scan_large_files, root, float(self.lf_min.currentData()), parent=self)
         self._worker = worker
 
         def done(files):
@@ -196,6 +196,7 @@ class ToolsPage(QWidget):
         self.ed_summary.setObjectName("Secondary")
         v.addWidget(self.ed_summary)
         self.ed_list = QListWidget()
+        smooth_scroll(self.ed_list)
         v.addWidget(self.ed_list, 1)
         row = QHBoxLayout()
         self.btn_all = pill("全选", "secondary")

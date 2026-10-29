@@ -56,13 +56,13 @@ def _scan_target(t: TargetSpec, cancel=None, progress=None) -> list[CleanItem]:
             if progress and matched % 50 == 0:
                 progress(f"扫描 {base.name}: 已发现 {matched} 项")
             try:
-                if m.is_dir(follow_symlinks=False):
-                    if is_reparse_point(m):
-                        continue
+                if is_reparse_point(m):
+                    continue
+                if m.is_dir():
                     size, files = dir_size(m, cancel=cancel)
                     # 匹配到的目录按「清空内容」处理：目录本身保留，浏览器等应用可继续使用
                     items.append(CleanItem(m, "contents", size, files))
-                elif m.is_file(follow_symlinks=False):
+                elif m.is_file():
                     items.append(CleanItem(m, "file", m.stat().st_size, 1))
             except OSError:
                 continue

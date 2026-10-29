@@ -72,7 +72,7 @@ class DevJunkItem:
 
 
 def scan_dev_junk(root: Path, max_depth: int = 6, excludes: set[str] | None = None,
-                  cancel=None, progress=None) -> list[DevJunkItem]:
+                  cancel=None, progress=None, skip_hidden_root: bool = True) -> list[DevJunkItem]:
     found: list[DevJunkItem] = []
     scanned = 0
     excludes = excludes or set()
@@ -97,8 +97,13 @@ def scan_dev_junk(root: Path, max_depth: int = 6, excludes: set[str] | None = No
             full = Path(e.path)
             if is_reparse_point(full):
                 continue
-            if cur == root and e.name in excludes:
-                continue
+            if cur == root:
+                # 根目录下的隐藏目录（.cache、.vscode 等）多为工具自身的运行时/配置，
+                # 里面的 node_modules、dist 不应被当成垃圾，跳过
+                if e.name in excludes:
+                    continue
+                if skip_hidden_root and e.name.startswith("."):
+                    continue
             if is_dev_dir(full):
                 size, files = dir_size(full, cancel=cancel)
                 found.append(DevJunkItem(full, e.name, size, files))

@@ -1,9 +1,10 @@
 """主窗口：无边框、macOS 风格红绿灯按钮、侧边栏导航。"""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QSettings, QPoint
-from PySide6.QtWidgets import (QButtonGroup, QFrame, QHBoxLayout, QLabel, QMainWindow,
-                               QPushButton, QSizeGrip, QStackedWidget, QVBoxLayout, QWidget)
+from PySide6.QtCore import Qt, QSettings, QPoint, QEasingCurve, QPropertyAnimation, QTimer
+from PySide6.QtWidgets import (QButtonGroup, QFrame, QGraphicsOpacityEffect, QHBoxLayout,
+                               QLabel, QMainWindow, QPushButton, QSizeGrip, QStackedWidget,
+                               QVBoxLayout, QWidget)
 
 from .. import APP_NAME, APP_VERSION
 from .clean_page import CleanPage
@@ -146,6 +147,7 @@ class MainWindow(QMainWindow):
         self._nav_buttons: dict[str, QPushButton] = {}
         self._pages: dict[str, QWidget] = {}
         self.stack = QStackedWidget()
+        self._page_anim = None
         for pid, label, cls in _PAGES:
             b = QPushButton(label)
             b.setObjectName("NavButton")
@@ -155,9 +157,11 @@ class MainWindow(QMainWindow):
             self._group.addButton(b)
             sv.addWidget(b)
             self._nav_buttons[pid] = b
-            page = cls(self.ctx)
-            self.stack.addWidget(page)
-            self._pages[pid] = page
+            # 首屏只构建「体检」页，其余页面在窗口显示后再构建，启动更快
+            if pid == "dashboard":
+                page = cls(self.ctx)
+                self.stack.addWidget(page)
+                self._pages[pid] = page
         sv.addStretch(1)
 
         tip = QFrame()
@@ -177,19 +181,72 @@ class MainWindow(QMainWindow):
         self._grip = QSizeGrip(root)
         self._grip.setFixedSize(16, 16)
         self._nav_buttons["dashboard"].setChecked(True)
+        QTimer.singleShot(0, self._build_rest_pages)
+
+    def _build_rest_pages(self):
+        for pid, _label, cls in _PAGES:
+            if pid in self._pages:
+                continue
+            page = cls(self.ctx)
+            self.stack.addWidget(page)
+            self._pages[pid] = page
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
         self._grip.move(self.width() - 18, self.height() - 18)
         self._grip.raise_()
 
+    def showEvent(self, e):
+        super().showEvent(e)
+        if not getattr(self, "_faded_in", False):
+            self._faded_in = True
+            self.setWindowOpacity(0.0)
+            anim = QPropertyAnimation(self, b"windowOpacity", self)
+            anim.setDuration(240)
+            anim.setStartValue(0.0)
+            anim.setEndValue(1.0)
+            anim.setEasingCurve(QEasingCurve.OutCubic)
+            anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
+
     def show_page(self, pid: str):
-        self.stack.setCurrentWidget(self._pages[pid])
+        if pid not in self._pages:
+            self._build_rest_pages()
+        page = self._pages[pid]
+        if self.stack.currentWidget() is page:
+            return
+        self.stack.setCurrentWidget(page)
         for k, b in self._nav_buttons.items():
             b.setChecked(k == pid)
-        page = self._pages[pid]
         if hasattr(page, "on_show"):
             page.on_show()
+        self._fade_page(page)
+
+    def _fade_page(self, page: QWidget):
+        old = getattr(self, "_page_anim", None)
+        self._page_anim = None
+        if old is not None:
+            try:
+                if old.state() == QPropertyAnimation.State.Running:
+                    old.stop()  # 触发 finished，自动清理上一页的特效
+            except RuntimeError:
+                pass  # 上一个动画已自然结束并被 DeleteWhenStopped 自动回收
+        eff = QGraphicsOpacityEffect(page)
+        eff.setOpacity(0.0)
+        page.setGraphicsEffect(eff)
+        anim = QPropertyAnimation(eff, b"opacity", self)
+        anim.setDuration(180)
+        anim.setStartValue(0.0)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QEasingCurve.OutCubic)
+
+        def _done():
+            if page.graphicsEffect() is not None:
+                page.setGraphicsEffect(None)
+            self._page_anim = None
+
+        anim.finished.connect(_done)
+        self._page_anim = anim
+        anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
 
     def toggle_max(self):
         if self.isMaximized():

@@ -1,10 +1,13 @@
 """通用小组件：卡片、胶囊按钮、进度环、标签、进度对话框。"""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QRectF
+import time
+
+from PySide6.QtCore import Qt, QRectF, QEasingCurve, QPropertyAnimation, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import (QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox,
-                               QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QDialog, QFrame, QGraphicsOpacityEffect,
+                               QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout,
+                               QWidget)
 
 from .theme import ACCENT, TEXT_2
 
@@ -23,6 +26,36 @@ def chip(text: str, level: str) -> QLabel:
     l.setObjectName("ChipLow" if level == "low" else "ChipMedium")
     l.setAlignment(Qt.AlignCenter)
     return l
+
+
+def fade_in(w: QWidget, delay_ms: int = 0, duration_ms: int = 200) -> None:
+    """轻微淡入动画，结束后移除特效以恢复最快渲染路径。"""
+    if w.graphicsEffect() is not None:
+        w.setGraphicsEffect(None)
+    eff = QGraphicsOpacityEffect(w)
+    eff.setOpacity(0.0)
+    w.setGraphicsEffect(eff)
+    anim = QPropertyAnimation(eff, b"opacity", w)
+    anim.setDuration(duration_ms)
+    anim.setStartValue(0.0)
+    anim.setEndValue(1.0)
+    anim.setEasingCurve(QEasingCurve.OutCubic)
+
+    def _cleanup():
+        w.setGraphicsEffect(None)
+        anim.deleteLater()
+
+    anim.finished.connect(_cleanup)
+    if delay_ms > 0:
+        QTimer.singleShot(delay_ms, anim.start)
+    else:
+        anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
+
+
+def smooth_scroll(view) -> None:
+    """列表/表格改为逐像素滚动，滚轮更顺滑。"""
+    view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+    view.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
 
 class Card(QFrame):
@@ -57,7 +90,7 @@ def page_header(title: str, subtitle: str = "") -> QWidget:
 
 
 class Ring(QWidget):
-    """圆环进度指示器。"""
+    """圆环进度指示器，数值变化带缓动动画。"""
 
     def __init__(self, diameter: int = 150, thickness: int = 13, parent=None):
         super().__init__(parent)
@@ -66,15 +99,33 @@ class Ring(QWidget):
         self._sub = ""
         self._color = ACCENT
         self._thickness = thickness
+        self._anim_from = 0.0
+        self._anim_target = 0.0
+        self._anim_t0 = 0.0
+        self._timer = QTimer(self)
+        self._timer.setInterval(16)
+        self._timer.timeout.connect(self._tick)
         self.setFixedSize(diameter, diameter)
 
     def set_value(self, value: float, text: str = "", sub: str = "", color: str | None = None):
-        self._value = max(0.0, min(1.0, value))
         self._text = text
         self._sub = sub
         if color:
             self._color = color
+        self._anim_from = self._value
+        self._anim_target = max(0.0, min(1.0, value))
+        self._anim_t0 = time.perf_counter()
+        if not self._timer.isActive():
+            self._timer.start()
+
+    def _tick(self):
+        p = min(1.0, (time.perf_counter() - self._anim_t0) / 0.6)
+        eased = 1 - (1 - p) ** 3  # OutCubic
+        self._value = self._anim_from + (self._anim_target - self._anim_from) * eased
         self.update()
+        if p >= 1.0:
+            self._timer.stop()
+            self._value = self._anim_target
 
     def paintEvent(self, ev):
         p = QPainter(self)

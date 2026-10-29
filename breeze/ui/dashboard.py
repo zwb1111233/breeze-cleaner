@@ -14,7 +14,7 @@ from ..core.devjunk import HOME_EXCLUDES, dev_result, scan_dev_junk
 from ..core.rules import load_rules
 from ..core.scanner import scan_all
 from ..workers import Worker
-from .widgets import Card, Ring, human, page_header, pill
+from .widgets import Card, Ring, fade_in, human, page_header, pill
 
 CATEGORY_ICONS = {"system": "⚙️", "browser": "🌐", "dev": "🛠️", "recycle": "🗑️"}
 
@@ -191,6 +191,12 @@ class DashboardPage(QWidget):
             card.body.addWidget(meta)
             self.grid.addWidget(card, i // 3, i % 3)
         self.summary_card.setVisible(bool(results))
+        if results:
+            fade_in(self.summary_card, duration_ms=200)
+            for i in range(self.grid.count()):
+                card = self.grid.itemAt(i).widget()
+                if card is not None:
+                    fade_in(card, delay_ms=60 + i * 45, duration_ms=280)
         if cancelled:
             self.status.setText("已取消，下面是已完成部分的结果。")
         else:

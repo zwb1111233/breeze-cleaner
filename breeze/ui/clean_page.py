@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QCheckBox, QDialog, QHBoxLayout, QLabel, QListWid
 from ..core import platform
 from ..core.cleaner import clean_results
 from ..workers import Worker
-from .widgets import Card, chip, human, page_header, pill, run_with_progress
+from .widgets import Card, chip, fade_in, human, page_header, pill, run_with_progress
 
 CATEGORY_ICONS = {"system": "⚙️", "browser": "🌐", "dev": "🛠️"}
 
@@ -62,6 +62,17 @@ class CleanPage(QWidget):
         self.ctx.main_window._pages["dashboard"].start_scan()
 
     def _rebuild(self):
+        self.setUpdatesEnabled(False)
+        try:
+            self._rebuild_items()
+        finally:
+            self.setUpdatesEnabled(True)
+        if self.list_host.count():
+            host = self.list_host.itemAt(0).widget()
+            if host is not None:
+                fade_in(host, duration_ms=170)
+
+    def _rebuild_items(self):
         while self.list_host.count():
             item = self.list_host.takeAt(0)
             w = item.widget()
@@ -150,6 +161,7 @@ class CleanPage(QWidget):
         info.setObjectName("Secondary")
         v.addWidget(info)
         lst = QListWidget()
+        lst.setObjectName("DetailList")
         for item in r.items[:400]:
             lst.addItem(f"{human(item.size):>10}   {item.path}")
         v.addWidget(lst, 1)

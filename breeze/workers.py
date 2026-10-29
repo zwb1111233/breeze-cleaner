@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import threading
+import time
 
 from PySide6.QtCore import QThread, Signal
+
+_MIN_PROGRESS_INTERVAL = 0.03  # 进度消息至少间隔 30ms，防止海量条目刷爆事件队列
 
 
 class Worker(QThread):
@@ -18,8 +21,19 @@ class Worker(QThread):
         self.cancel_event = threading.Event()
 
     def run(self):
+        last_t = 0.0
+        last_msg = None
+
+        def emit(msg):
+            nonlocal last_t, last_msg
+            now = time.monotonic()
+            if msg != last_msg or now - last_t >= _MIN_PROGRESS_INTERVAL:
+                last_t = now
+                last_msg = msg
+                self.progress.emit(msg)
+
         try:
-            result = self._fn(*self._args, cancel=self.cancel_event, progress=self.progress.emit)
+            result = self._fn(*self._args, cancel=self.cancel_event, progress=emit)
         except Exception as e:  # 工作线程内兜底，不让界面崩
             self.failed.emit(f"{type(e).__name__}: {e}")
             return

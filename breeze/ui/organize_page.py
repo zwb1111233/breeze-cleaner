@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QFileDia
 from ..core.organizer import (CATEGORY_ICONS, execute_plan, last_session,
                               plan_organization, undo_last_session)
 from ..workers import Worker
-from .widgets import Card, human, page_header, pill, run_with_progress
+from .widgets import Card, human, page_header, pill, run_with_progress, smooth_scroll
 
 _MODES = ["按类型", "按类型 + 月份", "按月份"]
 _MODE_IDS = {0: "type", 1: "type_date", 2: "date"}
@@ -72,6 +72,7 @@ class OrganizePage(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        smooth_scroll(self.table)
         self.result_card.body.addWidget(self.result_title)
         self.result_card.body.addWidget(self.table)
         self.result_card.hide()
